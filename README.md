@@ -2,8 +2,8 @@
 
 > **Đồ án môn học:** Phát triển Ứng dụng Web (IS207)  
 > **Kiến trúc:** Frontend-Only Single Page Application (React 18 + Vite + Tailwind CSS + LocalStorage)  
-> **Tác giả:** Vũ Tuấn Anh  
-> **GitHub Repository:** [https://github.com/vuttuananh168/MiniProject_IS207_AI.git](https://github.com/vuttuananh168/MiniProject_IS207_AI.git)
+> **Tác giả:** Mai Đào Hoài Bảo
+> **GitHub Repository:** [https://github.com/baromais-1106/mini-codex.git](https://github.com/baromais-1106/mini-codex.git)
 
 ---
 
