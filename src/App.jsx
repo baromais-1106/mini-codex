@@ -1,140 +1,57 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Footer from './components/Footer';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
+import { BookOpen, ShoppingBasket, TrendingUp, Settings, Pause, Play, Volume2, VolumeX, X, ArrowRight, Check, Flame, Clock3, Coins, Star, ChevronRight, Trash2, Store, Heart, RotateCcw } from 'lucide-react';
+import { KEY, ITEMS, RECIPES, UPGRADES, money, load, reducer } from './game';
 
-// Core Pages
-import AuthPage from './pages/AuthPage';
-import ExplorePage from './pages/ExplorePage';
-import BookingPage from './pages/BookingPage';
-import PaymentPage from './pages/PaymentPage';
-import AccountPage from './pages/AccountPage';
-import AdminPage from './pages/AdminPage';
-import LookupPage from './pages/LookupPage';
-
-import { STORAGE_KEYS, getStorage, initInitialStorage } from './utils/storage';
-
-/**
- * Scroll to top on route navigation
- */
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [pathname]);
-  return null;
+function Bowl({ ingredients = ['base','pork','onion'], large = false }) {
+  return <svg className={`bowl-art ${large ? 'large' : ''}`} viewBox="0 0 160 115" role="img" aria-label="Tô cháo nóng"><ellipse cx="80" cy="99" rx="58" ry="9" fill="#40392d" opacity=".12"/><path d="M18 49Q22 94 65 98H95Q138 94 142 49" fill="#eee7d7" stroke="#38594c" strokeWidth="3"/><path d="M27 69Q80 87 134 69" fill="none" stroke="#df735a" strokeWidth="5"/><ellipse cx="80" cy="49" rx="62" ry="25" fill="#faf5e6" stroke="#38594c" strokeWidth="3"/><ellipse cx="80" cy="49" rx="53" ry="18" fill={ingredients.includes('base') ? '#e9d5a9' : '#fffaf0'}/>{ingredients.includes('base') && <path d="M48 51l8 2m12-14l7 2m31 15l7-2m-33 9l7 1m25-19l7 1" stroke="#fff1cf" strokeWidth="3" strokeLinecap="round"/>}{['pork','chicken','ribs','fish'].some(i=>ingredients.includes(i)) && <g fill={ingredients.includes('fish') ? '#f0e6ce' : ingredients.includes('chicken') ? '#d8a764' : '#b97860'} stroke={ingredients.includes('fish') ? '#b4a88c' : 'none'}><ellipse cx="65" cy="46" rx="11" ry="6" transform="rotate(-20 65 46)"/><ellipse cx="91" cy="48" rx="12" ry="7"/><ellipse cx="78" cy="56" rx="9" ry="5"/></g>}{ingredients.includes('onion') && <path d="M50 42l8 4m40 10l8-3m-29-15l7 3m-25 18l7-2m38-14l7 1" stroke="#458751" strokeWidth="4"/>}{ingredients.includes('egg') && <g><ellipse cx="101" cy="40" rx="15" ry="10" fill="#fffbea"/><ellipse cx="102" cy="40" rx="7" ry="6" fill="#e9a534"/></g>}{ingredients.includes('pepper') && <path d="M68 42h2m19 14h2m-38-5h2" stroke="#504332" strokeWidth="2"/>}<g className="steam" fill="none" stroke="#fffdf2" strokeWidth="3" strokeLinecap="round"><path d="M59 22q-9-7 0-17"/><path d="M80 18q-9-7 0-17"/><path d="M101 22q-9-7 0-17"/></g></svg>;
 }
-
-/**
- * Root Redirect Handler: Admin to /admin, others directly to /explore (NO forced login)
- */
-function RootRedirect() {
-  const currentUser = getStorage(STORAGE_KEYS.CURRENT_USER, null);
-  if (currentUser && currentUser.role === 'admin') {
-    return <Navigate to="/admin" replace />;
-  }
-  return <Navigate to="/explore" replace />;
+function Person({ look = 0 }) {
+  const colors = ['#d1a663','#dd856d','#648d88','#e3bb73','#98a17b'];
+  return <svg viewBox="0 0 120 135" className="person" aria-hidden="true"><ellipse cx="60" cy="130" rx="43" ry="5" fill="#40392d" opacity=".13"/><path d="M23 132v-27q0-26 37-26t37 26v27" fill={colors[look]} stroke="#493e33" strokeWidth="2.5"/><path d="M45 84l15 18 15-18" fill="#faf0d8"/><path d="M50 78v12q10 11 20 0V78" fill="#e5b98f"/><ellipse cx="60" cy="49" rx="30" ry="35" fill="#efc9a2" stroke="#493e33" strokeWidth="2.5"/><path d={look % 2 ? 'M30 50Q20 5 57 7Q97 2 92 56L79 31Q55 46 36 26Z' : 'M30 46Q22 8 58 8Q98 6 91 48L80 28Q58 41 35 28Z'} fill="#493e33"/>{look === 2 && <path d="M28 32h65L83 14H41Z" fill="#dadbc2" stroke="#493e33" strokeWidth="2"/>}<path d="M43 51h7m20 0h7" stroke="#493e33" strokeWidth="3" strokeLinecap="round"/><path d="M53 65q7 7 14 0" fill="none" stroke="#9c5f4d" strokeWidth="2"/><ellipse cx="41" cy="62" rx="6" ry="3" fill="#de9d80"/><ellipse cx="80" cy="62" rx="6" ry="3" fill="#de9d80"/><path d="M36 111v21m48-21v21" stroke="#493e33" strokeWidth="2" opacity=".3"/></svg>;
 }
-
-/**
- * Protected Route wrapper for authenticated users, preserving target location
- */
-function RequireAuth({ children }) {
-  const location = useLocation();
-  const currentUser = getStorage(STORAGE_KEYS.CURRENT_USER, null);
-  if (!currentUser) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-  return children;
+function Modal({ title, subtitle, onClose, children, dismissible = true }) {
+  const ref = useRef();
+  useEffect(() => { const old = document.activeElement; ref.current?.focus(); const listener = e => { if(e.key === 'Escape' && dismissible) onClose(); if(e.key === 'Tab') { const nodes = ref.current.querySelectorAll('button:not(:disabled), input, [tabindex="0"]'); if(!nodes.length)return; const first=nodes[0],last=nodes[nodes.length-1]; if(e.shiftKey && (document.activeElement===first || document.activeElement===ref.current)){e.preventDefault();last.focus();} else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();} } }; document.addEventListener('keydown',listener); return () => {document.removeEventListener('keydown',listener);old?.focus();}; }, []);
+  return <div className="modal-backdrop" onClick={()=>dismissible&&onClose()}><section className="modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onClick={e=>e.stopPropagation()}><header><div><span className="eyebrow">QUÁN CHÁO ĐẦU HẺM</span><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{dismissible&&<button className="icon-button" onClick={onClose} aria-label="Đóng"><X size={20}/></button>}</header>{children}</section></div>;
 }
-
-/**
- * Protected Route wrapper for Admin users only
- */
-function RequireAdmin({ children }) {
-  const currentUser = getStorage(STORAGE_KEYS.CURRENT_USER, null);
-  if (!currentUser || currentUser.role !== 'admin') {
-    return <Navigate to="/explore" replace />;
-  }
-  return children;
-}
-
 export default function App() {
-  useEffect(() => {
-    // Initialize seed data if not present in localStorage
-    initInitialStorage();
-  }, []);
-
-  return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans selection:bg-sky-100 selection:text-sky-900">
-        {/* Global Navigation Bar */}
-        <Navbar />
-
-        {/* Main Application Routes */}
-        <div className="flex-1">
-          <Routes>
-            {/* Default Route */}
-            <Route path="/" element={<RootRedirect />} />
-
-            {/* 1. Explore Doctors & Hospitals (Public Landing) */}
-            <Route path="/explore" element={<ExplorePage />} />
-
-            {/* 2. Public Appointment Lookup by Phone */}
-            <Route path="/lookup" element={<LookupPage />} />
-
-            {/* 3. Auth Page (Login / Register) */}
-            <Route path="/auth" element={<AuthPage />} />
-
-            {/* 4. Booking Page */}
-            <Route
-              path="/booking/:type/:id"
-              element={
-                <RequireAuth>
-                  <BookingPage />
-                </RequireAuth>
-              }
-            />
-
-            {/* 5. Payment Page */}
-            <Route
-              path="/payment"
-              element={
-                <RequireAuth>
-                  <PaymentPage />
-                </RequireAuth>
-              }
-            />
-
-            {/* 6. Account Page (User Profile & Bookings) */}
-            <Route
-              path="/account"
-              element={
-                <RequireAuth>
-                  <AccountPage />
-                </RequireAuth>
-              }
-            />
-
-            {/* 7. Admin Dashboard */}
-            <Route
-              path="/admin"
-              element={
-                <RequireAdmin>
-                  <AdminPage />
-                </RequireAdmin>
-              }
-            />
-
-            {/* Fallback to root */}
-            <Route path="*" element={<RootRedirect />} />
-          </Routes>
-        </div>
-
-        {/* Global Footer */}
-        <Footer />
-      </div>
-    </BrowserRouter>
-  );
+  const [s, dispatch] = useReducer(reducer, undefined, load);
+  const [panel, setPanel] = useState(null), [category, setCategory] = useState('all'), [muted, setMuted] = useState(true), [saveError, setSaveError] = useState(false);
+  const sound = useRef(null);
+  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(s)); setSaveError(false); } catch { setSaveError(true); } }, [s]);
+  useEffect(() => { const id = setInterval(()=>dispatch({type:'TICK'}),1000); const hide=()=>{if(document.hidden)dispatch({type:'PAUSE'});}; const key=e=>{if(e.key==='Escape')dispatch({type:'PAUSE'});}; document.addEventListener('visibilitychange',hide); document.addEventListener('keydown',key); return ()=>{clearInterval(id);document.removeEventListener('visibilitychange',hide);document.removeEventListener('keydown',key);}; }, []);
+  const act = a => { dispatch(a); if(!muted){try{const ctx=sound.current || (sound.current=new(window.AudioContext||window.webkitAudioContext)());ctx.resume();const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=a.type==='SERVE'?660:440;g.gain.setValueAtTime(.035,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.1);o.start();o.stop(ctx.currentTime+.1);}catch{}} };
+  const open = p => {dispatch({type:'PAUSE'});setPanel(p);};
+  const close = () => setPanel(null);
+  const active = s.phase === 'open', recipe = id => RECIPES.find(r=>r.id===id), progress = Math.round(s.seconds / 240 * 100), hour = 6 + Math.floor(s.seconds / 60), available = RECIPES.filter(r=>r.day<=s.day);
+  return <div className="site-shell">
+    <header className="site-header"><a className="brand" href="#"><span className="brand-icon"><Store size={24}/></span><span>ĐẦU HẺM<small>MỘT CHÚT ẤM LÒNG</small></span></a><div className="header-right"><span className="local-badge"><i/> Chơi tại quán · Lưu trên máy</span><button className="icon-button" onClick={()=>setMuted(!muted)} aria-label={muted?'Bật âm thanh':'Tắt âm thanh'}>{muted?<VolumeX size={19}/>:<Volume2 size={19}/>}</button><button className="icon-button" onClick={()=>open('settings')} aria-label="Cài đặt"><Settings size={19}/></button></div></header>
+    <main className="workspace">
+      <aside className="left-rail"><span className="eyebrow">CHUYỆN MỘT QUÁN NHỎ</span><h1>Nồi cháo nóng.<br/>Một ngày <em>vui.</em></h1><p>Góc hẻm quen, nồi cháo thơm.<br/>Hôm nay mình cùng mở hàng nhé!</p><div className="daily-card"><div className="section-label"><span>THỰC ĐƠN HÔM NAY</span><span>0{available.length}</span></div>{RECIPES.map(r=><div className={`menu-row ${r.day>s.day?'locked':''}`} key={r.id}><Bowl ingredients={r.ingredients}/><div><strong>{r.name}</strong><small>{r.day>s.day?`Mở từ ngày ${r.day}`:money(r.price)}</small></div>{r.day<=s.day?<Check size={16}/>:<span className="lock-day">N{r.day}</span>}</div>)}<button className="text-button" onClick={()=>open('recipes')}>Xem sổ công thức <ArrowRight size={15}/></button></div><div className="handnote">Bán bằng cả tấm lòng,<br/>khách thương sẽ lại ghé. <Heart size={16}/></div><div className="rail-bottom">EST. 2026 <span>•</span> HẺM NHỎ, ƯỚC MƠ TO</div></aside>
+      <section className="game-column" aria-label="Quầy bán cháo"><div className="game-top"><div className="day-stamp"><span>NGÀY</span><b>{String(s.day).padStart(2,'0')}</b></div><div className="wallet"><span>TIỀN TRONG KÉT</span><strong><Coins size={17}/>{money(s.cash)}</strong></div><div className="rating"><Star size={16} fill="currentColor"/><b>{s.rating.toFixed(1)}</b></div><button className="pause-button" onClick={()=>dispatch({type:active?'PAUSE':'RESUME'})} disabled={!['open','paused'].includes(s.phase)} aria-label={active?'Tạm dừng':'Tiếp tục'}>{active?<Pause size={19}/>:<Play size={19}/>}</button></div>
+        <div className="shop"><div className="shop-sign"><span className="sign-flower">✳</span><div><small>CHÁO NHÀ NẤU · NGON TỪ TẤM LÒNG</small><h2>Quán Cháo <em>Đầu Hẻm</em></h2></div><span className="sign-flower">✳</span></div><div className="awning"/><div className="shop-scene"><div className="scene-wall"><span className="wall-menu">CHÁO NÓNG<br/><b>MỖI NGÀY</b><i>từ 22k</i></span><span className="pendant pendant-one"/><span className="pendant pendant-two"/><span className="wall-window"/><span className="plant">🪴</span><div className="service-status"><i className={active?'live':''}/>{active?'Đang mở cửa':s.phase==='paused'?'Tạm nghỉ một chút':s.phase==='report'?'Hẹn khách ngày mai':'Sắp mở hàng'}</div></div>
+          <div className="customers">{[0,1,2].map(i=>{const c=s.customers[i];return c?<button className={`customer ${s.bowl.length&&[...s.bowl].sort().join() === [...c.ingredients].sort().join()?'match':''}`} key={c.id} onClick={()=>act({type:'SERVE',id:c.id})} disabled={!active} aria-label={`Giao món cho ${c.name}: ${recipe(c.recipe).name}, ${c.note}`}><div className="speech"><span>{c.name}</span><strong>{recipe(c.recipe).name}</strong><small>{c.note}</small><div className="order-icons">{c.ingredients.map((id,j)=><span key={j}>{ITEMS[id].icon}</span>)}</div><div className="patience"><i style={{width:`${c.left/c.max*100}%`,background:c.left<12?'#c85743':undefined}}/></div></div><Person look={c.look}/></button>:<div className="empty-customer" key={`empty${i}`}><span>⌁</span><small>{s.phase==='prep'?'Chờ mở quán':'Đón khách mới'}</small></div>})}</div>
+          {s.phase==='prep' && <div className="start-card"><span className="eyebrow">CHÀO NGÀY MỚI</span><h3>{s.day===1?'Mở một quán nhỏ, nuôi một ước mơ.':'Khách quen đang chờ bạn!'}</h3><p>{s.day===1?'Nồi cháo đầu tiên và nguyên liệu đã sẵn sàng.':'Kiểm tra nguyên liệu trước khi bắt đầu ca mới.'}</p><button className="primary" onClick={()=>act({type:'START'})}>Mở hàng thôi <ArrowRight size={17}/></button></div>}
+          {s.phase==='paused' && !panel && <div className="start-card pause-card"><span className="eyebrow">NGHỈ TAY MỘT CHÚT</span><h3>Cháo vẫn còn ấm.</h3><p>Thời gian đã dừng. Sẵn sàng thì quay lại nhé!</p><button className="primary" onClick={()=>act({type:'RESUME'})}><Play size={16}/> Tiếp tục bán</button><button className="text-button" onClick={()=>open('end')}>Đóng quán sớm</button></div>}
+        </div><div className="counter-edge"><span>CHÁO THƠM · KHÁCH THƯƠNG</span><span>✦</span></div></div>
+        <div className="shift-bar"><span><Clock3 size={14}/> {String(hour).padStart(2,'0')}:{String(s.seconds%60).padStart(2,'0')}</span><div><i style={{width:`${progress}%`}}/></div><span>10:00</span><small>{s.stats.served} tô đã bán</small></div>
+        <div className="kitchen"><div className="kitchen-heading"><span><Flame size={17}/> GÓC BẾP NHỎ</span><span>Làm món bằng cả tấm lòng</span></div><div className="prep-area"><button className={`pot ${s.cooking?'cooking':''}`} onClick={()=>act({type:'COOK'})} disabled={!active || !!s.pot || !!s.cooking}><span className="pot-steam">〰 〰 〰</span><span className="pot-drawing"><span/></span><strong>{s.cooking?`Đang nấu · ${s.cooking}s`:s.pot?`${s.pot} phần cháo`:'Nấu mẻ mới'}</strong><small>{s.cooking?'Chờ cháo chín nhé':s.pot?'Nồi cháo nhà nấu':'Chạm để bật bếp'}</small></button><div className="bowl-tray"><div className="tray-heading"><span>TÔ ĐANG LÀM</span><button onClick={()=>act({type:'DISCARD'})} disabled={!s.bowl.length || !active} aria-label="Bỏ tô đang làm"><Trash2 size={15}/></button></div><Bowl ingredients={s.bowl} large/><p>{s.bowl.length?s.bowl.map(id=>ITEMS[id].name).join(' + '):'Chọn nguyên liệu bên dưới'}</p></div></div><div className="ingredient-tabs">{[['all','Tất cả'],['main','Cháo, thịt & cá'],['extra','Topping']].map(([id,label])=><button className={category===id?'selected':''} onClick={()=>setCategory(id)} key={id}>{label}</button>)}<button className="recipe-link" onClick={()=>open('recipes')} aria-label="Sổ công thức"><BookOpen size={17}/></button></div><div className="ingredients">{Object.entries(ITEMS).filter(([id,x])=>id!=='rice'&&(category==='all'||category===x.group)).map(([id,item])=><button key={id} className="ingredient" disabled={!active || (id==='base'?s.pot:s.stock[id])===0} onClick={()=>act({type:'ADD',id})}><small className="stock-count">{id==='base'?s.pot:s.stock[id]}</small><span>{item.icon}</span><b>{item.name}</b></button>)}</div><div className="hint" role="status">{s.notice || '① Chọn nguyên liệu  →  ② Chạm vào khách để giao món'}</div></div>
+        <nav className="bottom-nav"><button onClick={()=>open('market')}><ShoppingBasket size={21}/><span>Nhập hàng</span></button><button onClick={()=>open('upgrades')}><TrendingUp size={21}/><span>Nâng cấp</span></button><button onClick={()=>open('recipes')}><BookOpen size={21}/><span>Công thức</span></button><button onClick={()=>open('stats')}><Store size={21}/><span>Quán của tôi</span></button></nav>
+      </section>
+      <aside className="right-rail"><div className="weather-card"><span className="sun">☀</span><div><strong>Một ngày đẹp trời</strong><p>Hẻm nhỏ đã thức giấc.<br/>Mùi cháo thơm gọi khách về.</p></div></div><div className="notebook"><span className="paper-tape"/><span className="eyebrow">SỔ TAY CHỦ QUÁN</span><h3>Chậm một chút,<br/>ngon hơn một chút.</h3><div className="goal"><span className={s.stats.served>=5?'done':''}>{s.stats.served>=5?<Check size={13}/>:1}</span><div><strong>Bán 5 tô đầu tiên</strong><small>Một khởi đầu thật ấm áp</small><div className="goal-progress"><i style={{width:`${Math.min(100,s.stats.served/5*100)}%`}}/></div></div><b>{Math.min(5,s.stats.served)}/5</b></div><div className="goal"><span className={Object.values(s.upgrades).some(Boolean)?'done':''}>2</span><div><strong>Sắm đồ cho quán</strong><small>Tích góp để nâng cấp đầu tiên</small></div></div><div className="tip"><span>✦ MẸO NHỎ</span><p>Nhìn kỹ lời dặn của khách. Một tô đúng ý sẽ có thêm tiền boa!</p></div><div className="notebook-flower">❋</div></div><button className="guide-card" onClick={()=>open('guide')}><span>☞</span><div><strong>Lần đầu làm chủ quán?</strong><small>Xem hướng dẫn chơi</small></div><ChevronRight size={17}/></button><p className="save-status"><i/>{saveError?'Chưa lưu được — kiểm tra bộ nhớ trình duyệt':'Tiến trình tự động lưu trên máy'}</p></aside>
+    </main><footer className="site-footer"><span>Một quán nhỏ. Ngàn niềm vui.</span><span>QUÁN CHÁO ĐẦU HẺM <Heart size={12}/></span><span>Bản chơi thử · Frontend local</span></footer>
+    {saveError&&<div className="save-warning" role="alert">Không lưu được tiến trình. Bộ nhớ trình duyệt có thể đã đầy hoặc bị chặn.</div>}
+    {panel && <Modal title={{market:'Đi chợ đầu hẻm',upgrades:'Chăm chút cho quán',recipes:'Sổ công thức',settings:'Góc cài đặt',stats:'Quán của tôi',guide:'Học mở hàng',end:'Đóng quán sớm?',reset:'Bắt đầu lại?'}[panel]} subtitle={panel==='market'?`Trong két: ${money(s.cash)} · Mỗi gói 8 phần`:null} onClose={close}>
+      {panel==='market' && <><p className="panel-note">{s.phase==='prep'?'Chuẩn bị vừa đủ để cháo luôn tươi ngon.':'Bạn có thể nhập hàng trước ca bán tiếp theo.'}</p>{Object.entries(ITEMS).filter(([id])=>id!=='base').map(([id,item])=><div className="shop-row" key={id}><span className="item-emoji">{item.icon}</span><div><strong>{item.name}</strong><small>Còn {s.stock[id]} phần · +8 phần/gói</small></div><button disabled={s.phase!=='prep'||s.cash<item.price*8||s.stock[id]>72} onClick={()=>act({type:'BUY',id})}>{money(item.price*8)} <span>+</span></button></div>)}{s.cash<20000&&!s.rescueUsed&&s.phase==='prep'&&<button className="primary" onClick={()=>act({type:'RESCUE'})}>Nhận gói hỗ trợ 50.000đ</button>}</>}
+      {panel==='upgrades' && <><p className="panel-note">Nâng cấp giữa các ca. Mỗi món đồ là một bước tiến.</p>{UPGRADES.map(u=><div className="upgrade-row" key={u.id}><span className="item-emoji">{u.icon}</span><div><strong>{u.name}</strong><small>{u.desc} · Cấp {s.upgrades[u.id]}/3</small><button disabled={s.phase!=='prep'||s.upgrades[u.id]>=3||s.cash<u.price*(s.upgrades[u.id]+1)} onClick={()=>act({type:'UPGRADE',id:u.id})}>{s.upgrades[u.id]>=3?'Đã tối đa':`Nâng cấp · ${money(u.price*(s.upgrades[u.id]+1))}`}</button></div></div>)}</>}
+      {panel==='recipes' && <><p className="panel-note">Chọn đủ thành phần theo lời khách dặn. Cháo nền được nấu từ gạo thơm; cháo cá gồm cháo nền, cá lóc và hành. Thứ tự không quan trọng.</p>{RECIPES.map(r=><div className="recipe-row" key={r.id}><Bowl ingredients={r.ingredients}/><div><strong>{r.name}</strong><small>{r.ingredients.map(i=>ITEMS[i].name).join(' + ')}</small><b>{money(r.price)} {r.day>s.day&&`· Mở ngày ${r.day}`}</b></div></div>)}<div className="tip"><p>“Không hành”: bỏ hành khỏi công thức.<br/>“Thêm trứng”: thêm một phần trứng vào tô.</p></div></>}
+      {panel==='stats' && <><div className="stat-grid"><div><span>Ngày mở quán</span><b>{s.day}</b></div><div><span>Tổng tô đã bán</span><b>{s.totalServed}</b></div><div><span>Khách đánh giá</span><b>★ {s.rating.toFixed(1)}</b></div><div><span>Tiền trong két</span><b>{money(s.cash)}</b></div></div><p className="panel-note">Tiến trình lưu trong trình duyệt này. Chưa kết nối tài khoản hoặc máy chủ.</p></>}
+      {panel==='guide' && <div className="guide-steps">{[['01','Chuẩn bị mở hàng','Mua nguyên liệu ở mục Nhập hàng. Ngày đầu đã có sẵn một nồi cháo tặng bạn.'],['02','Làm một tô thật ngon','Chạm cháo nền, thịt và hành. Đọc kỹ yêu cầu thêm trứng hoặc không hành.'],['03','Giao đúng khách','Chạm nhân vật để giao tô. Giao nhanh và đúng sẽ có thêm tiền boa.'],['04','Nuôi quán lớn dần','Hết cháo thì chạm nồi để nấu thêm. Cuối ca xem báo cáo, nhập hàng và nâng cấp.']].map(([n,t,d])=><div key={n}><b>{n}</b><section><strong>{t}</strong><p>{d}</p></section></div>)}</div>}
+      {panel==='settings' && <><button className="setting-row" onClick={()=>setMuted(!muted)}><span>Âm thanh thao tác</span><b>{muted?'Đang tắt':'Đang bật'}</b></button><button className="setting-row" onClick={()=>setPanel('guide')}><span>Hướng dẫn chơi</span><BookOpen size={17}/></button><p className="panel-note">Rời tab sẽ tự tạm dừng. Dữ liệu lưu riêng trên máy này.</p><button className="danger-button" onClick={()=>setPanel('reset')}><RotateCcw size={16}/> Chơi lại từ đầu</button></>}
+      {panel==='reset' && <><p>Bắt đầu lại sẽ xóa tiến trình game quán cháo trên trình duyệt này.</p><button className="danger-button" onClick={()=>{act({type:'RESET'});close();}}>Xác nhận chơi lại</button><button className="text-button" onClick={()=>setPanel('settings')}>Giữ tiến trình</button></>}
+      {panel==='end' && <><p>Ca sẽ kết thúc ngay. Cháo dư và tô đang làm được tính vào hao hụt.</p><button className="primary" onClick={()=>{act({type:'CLOSE'});close();}}>Đóng quán và xem báo cáo</button></>}
+      {['market','upgrades'].includes(panel)&&<p className="panel-feedback" role="status">{s.notice}</p>}
+    </Modal>}
+    {s.phase==='report'&&!panel&&<Modal title="Một ngày thật đáng nhớ" subtitle={`Tổng kết ngày ${s.day} · Cảm ơn những vị khách ghé quán`} onClose={()=>{}} dismissible={false}><div className="report-hero"><Bowl/><strong>{s.report.served} tô cháo ấm lòng</strong></div>{[['Doanh thu & tiền boa',s.report.revenue],['Giá vốn đã bán',-s.report.cogs],['Hao hụt',-s.report.waste],['Phí vận hành',-s.report.overhead]].map(([label,n])=><div className="report-row" key={label}><span>{label}</span><b>{money(n)}</b></div>)}<div className="report-row report-total"><span>Lợi nhuận vận hành</span><b>{money(s.report.profit)}</b></div><p className="panel-note">{s.report.lost} khách bỏ về · {s.report.wrong} tô sai · {s.report.unfinished} đơn chưa xong</p><button className="primary" onClick={()=>act({type:'NEXT'})}>Chuẩn bị ngày {s.day+1} <ArrowRight size={17}/></button></Modal>}
+  </div>;
 }
