@@ -1,7 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fresh,reducer,orderFor,PEOPLE,MARKETING,arrivalInterval,load,KEY} from './game.js';
+import {fresh,reducer,orderFor,PEOPLE,MARKETING,marketingDaysLeft,arrivalInterval,load,KEY} from './game.js';
 const action=(s,type,extra={})=>reducer(s,{type,...extra});
+const forgottenPayment=()=>{let s=action(fresh(),'START');const c=s.customers[0];for(const id of c.ingredients)s=action(s,'ADD',{id});return action(s,'SERVE',{id:c.id,roll:0});};
+test('forgotten payment pauses the shift and pays exactly once after five punches',()=>{
+  let s=forgottenPayment();assert.equal(s.phase,'payment');assert.equal(s.cash,300000);assert.equal(s.stats.revenue,0);assert.equal(s.stats.cogs,7000);assert.equal(s.stats.served,1);
+  for(const type of ['TICK','CLOSE','PAUSE','RESUME','PUNCH','COOK'])assert.deepEqual(action(s,type),s);
+  s=action(s,'COMBAT');assert.equal(s.encounter.hp,100);
+  assert.deepEqual(action(s,'LET_GO'),s);
+  for(let i=1;i<=4;i++){s=action(s,'PUNCH');assert.equal(s.encounter.hp,100-i*20);assert.equal(s.cash,300000);}
+  s=action(s,'PUNCH');assert.equal(s.encounter.hp,0);assert.equal(s.encounter.stage,'paid');assert.equal(s.cash,322000);assert.equal(s.stats.revenue,22000);assert.equal(s.stats.cogs,7000);
+  assert.deepEqual(action(s,'PUNCH'),s);assert.deepEqual(action(s,'TICK'),s);
+  s=action(s,'FINISH_COMBAT');assert.equal(s.phase,'open');assert.equal(s.encounter,null);assert.deepEqual(action(s,'PUNCH'),s);
+});
+test('declining loses the payment; staff also trigger the event; random threshold is 15 percent',()=>{
+  let s=action(forgottenPayment(),'LET_GO');assert.equal(s.phase,'open');assert.equal(s.cash,300000);assert.equal(s.stats.unpaid,1);assert.equal(s.stats.cogs,7000);assert.equal(s.encounter,null);assert.deepEqual(action(s,'LET_GO'),s);
+  const open=action(action(fresh(),'HIRE',{id:'server'}),'START');
+  assert.equal(action({...open,seconds:4},'TICK',{roll:.149}).phase,'payment');
+  const paid=action({...open,seconds:4},'TICK',{roll:.15});assert.equal(paid.phase,'open');assert.equal(paid.stats.revenue>0,true);
+});
+test('combat progress survives reload without paying early or twice',()=>{
+  const previous=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+  let saved=action(action(forgottenPayment(),'COMBAT'),'PUNCH');
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{getItem:()=>JSON.stringify(saved)}});
+  try{
+    let s=load();assert.equal(s.phase,'payment');assert.equal(s.encounter.hp,80);assert.equal(s.cash,300000);
+    for(let i=0;i<4;i++)s=action(s,'PUNCH');saved=s;
+    s=load();assert.equal(s.encounter.stage,'paid');assert.equal(s.cash,322000);assert.deepEqual(action(s,'PUNCH'),s);
+  }finally{if(previous)Object.defineProperty(globalThis,'localStorage',previous);else delete globalThis.localStorage;}
+});
 test('serve consumes stock once and duplicate delivery cannot pay twice',()=>{let s=action(fresh(),'START');const c=s.customers[0];for(const id of c.ingredients)s=action(s,'ADD',{id});assert.equal(s.stock.pork,11);assert.equal(s.pot,7);s=action(s,'SERVE',{id:c.id});assert.equal(s.cash,325300);assert.equal(s.stats.cogs,7000);assert.equal(s.stats.served,1);assert.deepEqual(action(s,'SERVE',{id:c.id}),s);});
 test('wrong bowl is waste, not revenue; paused commands do nothing',()=>{let s=action(fresh(),'START');s=action(s,'ADD',{id:'base'});s=action(s,'SERVE',{id:s.customers[0].id});assert.equal(s.stats.waste,1500);assert.equal(s.cash,300000);s=action(s,'PAUSE');assert.deepEqual(action(s,'TICK'),s);assert.deepEqual(action(s,'ADD',{id:'pork'}),s);});
 test('cooking consumes rice once, pauses and produces exactly one batch in 10 seconds',()=>{let s={...fresh(),pot:0};s=action(s,'START');s=action(s,'COOK');assert.equal(s.stock.rice,0);assert.equal(s.cooking,10);s=action(s,'COOK');assert.equal(s.stock.rice,0);assert.equal(action(action(s,'PAUSE'),'TICK').cooking,10);for(let i=0;i<9;i++)s=action(s,'TICK');assert.equal(s.pot,0);assert.equal(s.cooking,1);s=action(s,'TICK');assert.equal(s.pot,8);assert.equal(s.cooking,0);s=action(s,'TICK');assert.equal(s.pot,8);});
@@ -10,11 +37,15 @@ test('purchases and upgrades respect phase, cash and capacity',()=>{let s=fresh(
 test('combined customizations are represented accurately',()=>{const c=orderFor({...fresh(),day:3,nextId:12});assert.ok(!c.ingredients.includes('onion'));assert.ok(c.ingredients.includes('egg'));assert.match(c.note,/Không hành/);assert.match(c.note,/Thêm trứng/);});
 test('full shift ends and next day can cook purchased stock',()=>{let s=action(fresh(),'START');for(let i=0;i<240;i++)s=action(s,'TICK');assert.equal(s.phase,'report');assert.ok(s.report.lost>0);s=action(s,'NEXT');s=action(s,'START');s=action(s,'COOK');assert.equal(s.cooking,10);});
 
-test('all six named customers have distinct stable looks',()=>{
-  const people=Array.from({length:6},(_,i)=>orderFor({...fresh(),nextId:i+1}));
+test('all eight named customers have distinct stable looks',()=>{
+  const people=Array.from({length:8},(_,i)=>orderFor({...fresh(),nextId:i+1}));
   assert.deepEqual(people.map(c=>c.name),PEOPLE);
-  assert.equal(new Set(people.map(c=>c.look)).size,6);
-  assert.equal(orderFor({...fresh(),nextId:12}).name,'Bé Ân');
+  assert.equal(new Set(people.map(c=>c.look)).size,8);
+  assert.equal(orderFor({...fresh(),nextId:14}).name,'Bé Ân');
+  assert.equal(people[6].name,'Chị Bảy');
+  assert.equal(people[7].name,'Anh Mười');
+  assert.equal(orderFor({...fresh(),nextId:15}).look,6);
+  assert.equal(orderFor({...fresh(),nextId:16}).look,7);
 });
 test('quay packs cost 35000 for ten, respect capacity, and add 8000 to an order',()=>{
   let s=action(fresh(),'BUY',{id:'quay'});
@@ -79,4 +110,42 @@ test('legacy saves preserve progress and receive new defaults',()=>{
   Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{getItem:key=>key===KEY?JSON.stringify(old):null}});
   try{const s=load();assert.equal(s.cash,432100);assert.equal(s.phase,'paused');assert.equal(s.stock.quay,0);assert.equal(s.staff.cook,0);assert.equal(s.marketing.gossip,0);assert.equal(s.customers[0].look,5);}
   finally{if(previous)Object.defineProperty(globalThis,'localStorage',previous);else delete globalThis.localStorage;}
+});
+
+test('marketing lasts exactly 5, 3 or 1 days without repeat charges and can be repurchased',()=>{
+  for(const [id,days,price] of [['toptop',5,1000000],['phobo',3,500000],['gossip',1,100000]]){
+    let s=action({...fresh(),day:7,cash:3000000},'MARKET',{id});
+    assert.equal(s.marketingUntil[id],7+days-1);
+    assert.equal(s.cash,3000000-price);
+    for(let elapsed=0;elapsed<days;elapsed++){
+      assert.equal(marketingDaysLeft(s,id),days-elapsed);
+      assert.equal(s.marketing[id],1);
+      assert.equal(s.expenses,elapsed===0?price:0);
+      if(id!=='gossip')assert.equal(action(s,'MARKET',{id}).cash,s.cash);
+      s=action({...s,pot:8},'START');
+      const before={...s,seconds:19};
+      const organic=action({...before,marketing:{toptop:0,phobo:0,gossip:0}},'TICK');
+      assert.ok(action(before,'TICK').nextId>organic.nextId);
+      s=action(s,'CLOSE');
+      assert.equal(s.report.expenses,elapsed===0?price:0);
+      const cash=s.cash;s=action(s,'NEXT');assert.equal(s.cash,cash);
+    }
+    assert.equal(s.marketing[id],0);assert.equal(marketingDaysLeft(s,id),0);
+    const expired=action({...s,pot:8},'START');
+    const before={...expired,seconds:19};
+    assert.equal(action(before,'TICK').nextId,action({...before,marketing:{toptop:0,phobo:0,gossip:0}},'TICK').nextId);
+    const renewed=action(s,'MARKET',{id});assert.equal(renewed.cash,s.cash-price);assert.equal(marketingDaysLeft(renewed,id),days);
+  }
+});
+test('campaign expiry survives save and reload; legacy active campaigns end after today',()=>{
+  const previous=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+  let saved=action({...fresh(),cash:2000000},'MARKET',{id:'toptop'});
+  saved=action(action(action(saved,'START'),'CLOSE'),'NEXT');
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{getItem:()=>JSON.stringify(saved)}});
+  try{
+    const restored=load();assert.equal(marketingDaysLeft(restored,'toptop'),4);assert.equal(restored.marketingUntil.toptop,5);
+    delete saved.marketingUntil;
+    const legacy=load();assert.equal(marketingDaysLeft(legacy,'toptop'),1);
+    assert.equal(action({...legacy,phase:'report'},'NEXT').marketing.toptop,0);
+  }finally{if(previous)Object.defineProperty(globalThis,'localStorage',previous);else delete globalThis.localStorage;}
 });
